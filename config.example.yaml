@@ -1,0 +1,55 @@
+# Kopiraj u config.yaml i prilagodi:  cp config.example.yaml config.yaml
+
+min_margin: 0.60          # 0.60 = javi samo oglase na kojima se može zaraditi 60 % i više
+run_at: "08:00"           # kad bot svaki dan pretražuje (lokalno vrijeme)
+history_days: 30          # koliko dana unazad se gledaju cijene za procjenu tržišne cijene
+min_comparables: 5        # minimalno usporedivih oglasa da bi procjena bila valjana
+sell_price_factor: 0.90   # realno prodaš ~10 % ispod medijana traženih cijena
+fee_percent: 0.0          # provizija portala/plaćanja (0.05 = 5 %)
+fixed_cost: 10            # trošak po komadu (gorivo, dostava, oglas izdvajanje) u valuti oglasa
+suspicious_ratio: 0.25    # cijena ispod 25 % tržišne = označi kao sumnjivo (moguća prevara)
+max_pages: 3              # koliko stranica rezultata po pretrazi
+request_delay: 2.0        # pauza između zahtjeva (sekunde) – budi pristojan prema portalu
+sources: [olx_ba]         # dostupno: olx_ba, njuskalo, demo
+db_path: afterbuy.db
+
+notify:
+  telegram:
+    # Napravi bota preko @BotFather, a chat_id dobiješ preko @userinfobot.
+    # Može i preko varijabli okoline AFTERBUY_TELEGRAM_TOKEN / AFTERBUY_TELEGRAM_CHAT_ID.
+    bot_token: ""
+    chat_id: ""
+
+# Riječi zbog kojih se oglas uvijek preskače (neispravno, zamjena, "kupujem"...).
+# Ako izostaviš ovaj ključ, koristi se ugrađeni popis.
+# exclude_words: [kupujem, zamjena, neispravan, za dijelove]
+
+# Što konkretnije pretrage = točnija procjena cijene.
+searches:
+  - name: iPhone 13 128GB
+    query: iphone 13 128gb
+    must_include: ["iphone 13"]
+    exclude: ["pro", "mini"]
+    min_price: 150
+    max_price: 1200
+
+  - name: PlayStation 5
+    query: playstation 5
+    must_include: ["ps5|playstation 5"]   # "a|b" = naslov mora sadržavati a ILI b
+    exclude: ["igrica", "igra ", "kontroler", "volan"]
+    min_price: 200
+    max_price: 1500
+
+  - name: Makita aku bušilica
+    query: makita aku busilica
+    must_include: ["makita"]
+    min_price: 50
+    max_price: 600
+
+  - name: Dyson V11
+    query: dyson v11
+    must_include: ["dyson"]
+    min_price: 100
+    max_price: 1000
+    market_price: 650     # ako nema dovoljno usporedivih oglasa, koristi ovu prodajnu cijenu
+    sources: [olx_ba, njuskalo]

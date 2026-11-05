@@ -1,0 +1,6 @@
+{"data": [
+  {"id": 111, "title": "iPhone 13 128GB plavi", "price": 450, "display_price": "450 KM", "location": {"name": "Sarajevo"}, "image": "https://img.olx.ba/1.jpg"},
+  {"id": 112, "title": "iPhone 13 128GB", "price": 0, "display_price": "Po dogovoru"},
+  {"id": 113, "title": "iPhone 13 128 GB crni", "display_price": "1.150 KM", "city": "Tuzla", "images": [{"url": "https://img.olx.ba/3.jpg"}]},
+  {"title": "bez id-a", "price": 100}
+], "meta": {"total": 3}}
