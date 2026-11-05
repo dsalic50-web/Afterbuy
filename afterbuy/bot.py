@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
-from afterbuy.analysis import estimate_market_price, evaluate, matches_search
+from afterbuy.analysis import evaluate, market_stats, matches_search
 from afterbuy.config import Config
 from afterbuy.db import Database, now_iso
 from afterbuy.models import Deal, Listing
@@ -50,25 +50,23 @@ def run_once(cfg: Config, db: Database, notifier: Notifier | None = None,
             result.listings += len(matched)
 
             prices = db.comparable_prices(search.name, source_name, cfg.history_days)
-            market = estimate_market_price(prices, cfg.min_comparables)
-            comparables = len(prices)
-            if market is None and search.market_price:
-                market = float(search.market_price)
-            if market is None:
+            activity = db.market_activity(search.name, source_name, cfg.history_days)
+            stats = market_stats(prices, cfg.min_comparables, search.market_price, activity)
+            if stats is None:
                 log.info("%s / %s: premalo usporedivih oglasa (%d) za procjenu cijene",
-                         source_name, search.name, comparables)
+                         source_name, search.name, len(prices))
                 continue
 
             for l in matched:
-                deal = evaluate(l, search, market, comparables, cfg)
-                if deal.margin >= cfg.min_margin:
+                deal = evaluate(l, search, stats, cfg=cfg)
+                if deal.margin >= cfg.min_margin and deal.sell_probability >= cfg.min_sell_probability:
                     result.deals.append(deal)
                     if db.upsert_deal(deal):
                         result.new_deals.append(deal)
             db.conn.commit()
 
     if notifier and result.new_deals:
-        for deal in notifier.send(sorted(result.new_deals, key=lambda d: d.margin, reverse=True)):
+        for deal in notifier.send(sorted(result.new_deals, key=lambda d: (d.sell_probability, d.margin), reverse=True)):
             db.mark_notified(deal)
 
     db.finish_run(run_id, result.listings, len(result.deals), len(result.new_deals), result.errors)

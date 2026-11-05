@@ -40,6 +40,7 @@ class TelegramConfig:
 class Config:
     searches: list[Search]
     min_margin: float = 0.60
+    min_sell_probability: float = 0.0
     run_at: str = "08:00"
     history_days: int = 30
     min_comparables: int = 5
@@ -84,7 +85,7 @@ def load_config(path: str | os.PathLike) -> Config:
 
     cfg = Config(searches=searches, telegram=telegram)
     for key in (
-        "min_margin", "run_at", "history_days", "min_comparables", "sell_price_factor",
+        "min_margin", "min_sell_probability", "run_at", "history_days", "min_comparables", "sell_price_factor",
         "fee_percent", "fixed_cost", "suspicious_ratio", "max_pages", "request_delay",
         "sources", "db_path",
     ):

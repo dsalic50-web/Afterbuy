@@ -1,6 +1,7 @@
 # Kopiraj u config.yaml i prilagodi:  cp config.example.yaml config.yaml
 
 min_margin: 0.60          # 0.60 = javi samo oglase na kojima se može zaraditi 60 % i više
+min_sell_probability: 0.0 # npr. 0.60 = javi samo oglase sa šansom prodaje >= 60 %
 run_at: "08:00"           # kad bot svaki dan pretražuje (lokalno vrijeme)
 history_days: 30          # koliko dana unazad se gledaju cijene za procjenu tržišne cijene
 min_comparables: 5        # minimalno usporedivih oglasa da bi procjena bila valjana

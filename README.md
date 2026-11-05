@@ -19,6 +19,51 @@ Za svaku tvoju pretragu (npr. *iPhone 13 128GB*):
 Oglasi s cijenom ispod 25 % tržišne označeni su kao **sumnjivi** (česte prevare).
 Svaki oglas javlja se samo jednom.
 
+## Objašnjenje za svaki oglas + šansa prodaje
+
+Uz svaki oglas bot napiše za koliko ga možeš preprodati i koliko je vjerojatno da ćeš uspjeti:
+
+```
+🔥 iPhone 13 128GB plavi
+💰 Cijena oglasa: 250 KM
+📈 Preprodaja: ~450 KM (brzo ~420, uz strpljenje ~500)
+✅ Zarada: ~190 KM (+76 %)
+🎯 Šansa prodaje: 83 % (🟢 visoka)
+⏱ Prodaja za ~5 dana
+
+Prodavač traži 250 KM. Usporedio sam ga sa sličnim oglasima (24): većina traži između
+470 i 550 KM (medijan 500 KM). Realno ga možeš preprodati za ~450 KM ...
+
+Zašto takva šansa:
++ Traženo: 62 % praćenih oglasa nestalo je s portala (vjerojatno prodano).
++ Slični artikli nestanu u prosjeku za ~5 dana.
++ Veliko tržište (usporedivih oglasa: 24), procjena cijene je pouzdana.
++ Zarađuješ i ako prodaš brzo i jeftinije (~160 KM).
+```
+
+**Raspon cijene:** *brzo* = donji kvartil cijena sličnih oglasa, *realno* = medijan,
+*uz strpljenje* = gornji kvartil (sve × `sell_price_factor`).
+
+**Šansa prodaje (5–95 %)** kreće od 50 % i diže se ili spušta prema:
+
+| Faktor | Utjecaj |
+|---|---|
+| Koliko sličnih oglasa nestane s portala (vjerojatno prodano) | +20 / +8 / −15 |
+| Za koliko dana nestanu | +10 (≤ 7 dana) … −8 (> 21 dan) |
+| Broj usporedivih oglasa | +10 … −5, −10 ako se koristi ručna cijena |
+| Ujednačenost cijena | +10 ujednačene, −10 jako raspršene |
+| Zarađuješ li i kod brze (jeftinije) prodaje | +15 / −10 |
+| Sumnjivo niska cijena | −25 |
+
+Brzinu prodaje bot uči sam: svaki dan bilježi koji oglasi su nestali s portala. Zato je
+**prvih par dana šansa grublja** (piše "brzina prodaje još nije poznata"), a nakon tjedan-dva
+postaje puno točnija. Nestanak oglasa ne znači uvijek prodaju (oglas može biti obrisan ili
+istekao), pa je ovo procjena, a ne garancija.
+
+U `config.yaml` možeš postaviti `min_sell_probability: 0.6` da ti bot javlja samo oglase sa
+šansom prodaje od 60 % i više. Na web ploči možeš sortirati po *Najveća šansa prodaje* i
+kliknuti *Zašto X % šanse prodaje?* za razloge.
+
 ## Pokretanje
 
 ```bash

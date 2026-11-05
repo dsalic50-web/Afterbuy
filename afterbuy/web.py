@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import threading
 
@@ -37,6 +38,19 @@ def create_app(cfg: Config, source_override: list[str] | None = None) -> Flask:
     def money(v):
         return "–" if v is None else f"{v:,.0f}".replace(",", ".")
 
+    @app.template_filter("reasons")
+    def reasons(raw):
+        try:
+            return json.loads(raw or "[]")
+        except ValueError:
+            return []
+
+    @app.template_filter("chance_class")
+    def chance_class(p):
+        if p is None:
+            return "mid"
+        return "high" if p >= 0.75 else ("mid" if p >= 0.5 else "low")
+
     @app.get("/")
     def index():
         status = request.args.get("status", "novo")
@@ -48,6 +62,8 @@ def create_app(cfg: Config, source_override: list[str] | None = None) -> Flask:
             deals = sorted(deals, key=lambda d: d["margin"], reverse=True)
         elif sort == "profit":
             deals = sorted(deals, key=lambda d: d["expected_profit"], reverse=True)
+        elif sort == "chance":
+            deals = sorted(deals, key=lambda d: (d["sell_probability"] or 0, d["margin"]), reverse=True)
         return render_template(
             "index.html", deals=deals, status=status, statuses=STATUSES, search=search, sort=sort,
             searches=[s.name for s in cfg.searches], runs=db.last_runs(5), summary=db.profit_summary(),

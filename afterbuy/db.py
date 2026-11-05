@@ -1,9 +1,22 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
 
+from afterbuy.analysis import Activity
 from afterbuy.models import Deal, Listing
+
+# Stupci dodani nakon prve verzije – dodaju se automatski u postojeću bazu.
+DEAL_EXTRA_COLUMNS = {
+    "quick_sell_price": "REAL",
+    "high_sell_price": "REAL",
+    "quick_profit": "REAL",
+    "sell_probability": "REAL",
+    "est_days_to_sell": "REAL",
+    "reasons": "TEXT DEFAULT '[]'",
+    "explanation": "TEXT DEFAULT ''",
+}
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS listings (
@@ -68,6 +81,10 @@ class Database:
         self.conn = sqlite3.connect(path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
+        existing = {r["name"] for r in self.conn.execute("PRAGMA table_info(deals)")}
+        for col, typ in DEAL_EXTRA_COLUMNS.items():
+            if col not in existing:
+                self.conn.execute(f"ALTER TABLE deals ADD COLUMN {col} {typ}")
         self.conn.commit()
 
     def close(self) -> None:
@@ -97,6 +114,34 @@ class Database:
         ).fetchall()
         return [r["price"] for r in rows]
 
+    def market_activity(self, search_name: str, source: str, days: int) -> Activity:
+        """Koliko je praćenih oglasa nestalo s portala (vjerojatno prodano) i nakon koliko dana.
+
+        Oglas je "praćen" ako je viđen prije zadnjeg pretraživanja, a "nestao" ako ga zadnje
+        pretraživanje više nije našlo.
+        """
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat(timespec="seconds")
+        rows = self.conn.execute(
+            "SELECT first_seen, last_seen FROM listings WHERE search_name=? AND source=? AND last_seen>=?",
+            (search_name, source, cutoff),
+        ).fetchall()
+        if not rows:
+            return Activity()
+        latest = max(datetime.fromisoformat(r["last_seen"]) for r in rows)
+        margin = timedelta(hours=1)
+        tracked = gone = 0
+        gone_days: list[float] = []
+        for r in rows:
+            first, last = datetime.fromisoformat(r["first_seen"]), datetime.fromisoformat(r["last_seen"])
+            if first >= latest - margin:
+                continue  # prvi put viđen u zadnjoj pretrazi – još ne znamo ništa
+            tracked += 1
+            if last < latest - margin:
+                gone += 1
+                # nestao između zadnjeg viđenja i sljedeće pretrage (~1 dan)
+                gone_days.append((last - first).total_seconds() / 86400 + 1)
+        return Activity(tracked=tracked, gone=gone, gone_days=gone_days)
+
     # --- prilike ----------------------------------------------------------
     def upsert_deal(self, deal: Deal) -> bool:
         """Spremi priliku. Vraća True ako je nova (još nije poslana obavijest)."""
@@ -106,17 +151,24 @@ class Database:
             """
             INSERT INTO deals (source, ext_id, search_name, title, url, image, location, currency, buy_price,
                                market_price, expected_sell_price, expected_profit, margin, comparables,
-                               suspicious, found_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                               suspicious, found_at, updated_at, quick_sell_price, high_sell_price,
+                               quick_profit, sell_probability, est_days_to_sell, reasons, explanation)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(source, ext_id, search_name) DO UPDATE SET
                 title=excluded.title, buy_price=excluded.buy_price, market_price=excluded.market_price,
                 expected_sell_price=excluded.expected_sell_price, expected_profit=excluded.expected_profit,
                 margin=excluded.margin, comparables=excluded.comparables, suspicious=excluded.suspicious,
-                updated_at=excluded.updated_at
+                updated_at=excluded.updated_at, quick_sell_price=excluded.quick_sell_price,
+                high_sell_price=excluded.high_sell_price, quick_profit=excluded.quick_profit,
+                sell_probability=excluded.sell_probability, est_days_to_sell=excluded.est_days_to_sell,
+                reasons=excluded.reasons, explanation=excluded.explanation
             """,
             (l.source, l.ext_id, deal.search_name, l.title, l.url, l.image, l.location, l.currency, l.price,
              deal.market_price, deal.expected_sell_price, deal.expected_profit, deal.margin,
-             deal.comparables, int(deal.suspicious), ts, ts),
+             deal.comparables, int(deal.suspicious), ts, ts, deal.quick_sell_price, deal.high_sell_price,
+             deal.quick_profit, deal.sell_probability, deal.est_days_to_sell,
+             json.dumps([{"points": r.points, "text": r.text} for r in deal.reasons], ensure_ascii=False),
+             deal.explanation),
         )
         row = self.conn.execute(
             "SELECT notified FROM deals WHERE source=? AND ext_id=? AND search_name=?",

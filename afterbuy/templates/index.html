@@ -6,10 +6,10 @@
 <title>Afterbuy – prilike za preprodaju</title>
 <style>
   :root { --bg:#f6f7f9; --card:#fff; --text:#1d2330; --muted:#667085; --line:#e4e7ec;
-          --accent:#0f7b4f; --accent-bg:#e6f4ee; --warn:#b54708; --warn-bg:#fef0c7; }
+          --accent:#0f7b4f; --accent-bg:#e6f4ee; --warn:#b54708; --warn-bg:#fef0c7; --bad:#b42318; --bad-bg:#fee4e2; }
   @media (prefers-color-scheme: dark) {
     :root { --bg:#12151b; --card:#1b2029; --text:#e8eaef; --muted:#98a2b3; --line:#2c3340;
-            --accent:#4cc38a; --accent-bg:#173a2a; --warn:#fdb022; --warn-bg:#3a2a0e; }
+            --accent:#4cc38a; --accent-bg:#173a2a; --warn:#fdb022; --warn-bg:#3a2a0e; --bad:#f97066; --bad-bg:#3d1714; }
   }
   * { box-sizing:border-box }
   body { margin:0; font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--text) }
@@ -33,6 +33,17 @@
   .actions { display:flex; flex-direction:column; gap:6px; min-width:170px }
   .actions input { width:100% }
   .flash { background:var(--accent-bg); color:var(--accent); padding:8px 12px; border-radius:8px }
+  .chance { display:inline-block; padding:2px 10px; border-radius:99px; font-weight:700 }
+  .chance.high { background:var(--accent-bg); color:var(--accent) }
+  .chance.mid { background:var(--warn-bg); color:var(--warn) }
+  .chance.low { background:var(--bad-bg); color:var(--bad) }
+  .meter { height:6px; border-radius:99px; background:var(--line); margin-top:4px; overflow:hidden; max-width:180px }
+  .meter i { display:block; height:100% }
+  .meter.high i { background:var(--accent) } .meter.mid i { background:var(--warn) } .meter.low i { background:var(--bad) }
+  .explain { margin-top:10px; padding:10px 12px; border-radius:8px; background:var(--bg); border:1px solid var(--line) }
+  details summary { cursor:pointer; color:var(--muted); margin-top:8px }
+  ul.reasons { margin:6px 0 0; padding-left:0; list-style:none }
+  ul.reasons li { padding:2px 0 } .plus { color:var(--accent) } .minus { color:var(--bad) }
   table { width:100%; border-collapse:collapse; font-size:13px } td,th { text-align:left; padding:4px 6px; border-bottom:1px solid var(--line) }
   @media (max-width:700px){ .deal { grid-template-columns:64px 1fr } .deal img,.noimg{width:64px;height:64px} .actions{grid-column:1/-1} }
 </style>
@@ -68,6 +79,7 @@
     <select name="sort" onchange="this.form.submit()">
       <option value="margin" {% if sort=='margin' %}selected{% endif %}>Najveća marža</option>
       <option value="profit" {% if sort=='profit' %}selected{% endif %}>Najveća zarada</option>
+      <option value="chance" {% if sort=='chance' %}selected{% endif %}>Najveća šansa prodaje</option>
       <option value="new" {% if sort=='new' %}selected{% endif %}>Najnovije</option>
     </select>
   </form>
@@ -79,13 +91,37 @@
       <h3><a href="{{ d.url }}" target="_blank" rel="noopener">{{ d.title }}</a></h3>
       <div class="muted">{{ d.search_name }} · {{ d.source }}{% if d.location %} · {{ d.location }}{% endif %} · {{ d.found_at[:10] }}</div>
       <div class="nums">
-        <span><span class="muted">Cijena</span><b>{{ d.buy_price|money }} {{ d.currency }}</b></span>
-        <span><span class="muted">Prodaja ~</span><b>{{ d.expected_sell_price|money }} {{ d.currency }}</b></span>
+        <span><span class="muted">Cijena oglasa</span><b>{{ d.buy_price|money }} {{ d.currency }}</b></span>
+        <span><span class="muted">Preprodaja ~</span><b>{{ d.expected_sell_price|money }} {{ d.currency }}</b></span>
         <span><span class="muted">Zarada ~</span><b>{{ d.expected_profit|money }} {{ d.currency }}</b></span>
         <span><span class="muted">Marža</span><b><span class="badge {% if d.suspicious %}warn{% endif %}">+{{ d.margin|pct }}</span></b></span>
+        {% if d.sell_probability is not none %}
+        <span><span class="muted">Šansa prodaje</span>
+          <b><span class="chance {{ d.sell_probability|chance_class }}">{{ d.sell_probability|pct }}</span></b>
+          <div class="meter {{ d.sell_probability|chance_class }}"><i style="width:{{ (d.sell_probability * 100)|round|int }}%"></i></div></span>
+        {% endif %}
       </div>
+      {% if d.quick_sell_price %}
+      <div class="muted" style="margin-top:6px">
+        Prodajna cijena: brzo ~{{ d.quick_sell_price|money }} · realno ~{{ d.expected_sell_price|money }} · uz strpljenje ~{{ d.high_sell_price|money }} {{ d.currency }}
+        {% if d.est_days_to_sell %} · prodaja za ~{{ d.est_days_to_sell|round|int }} dana{% endif %}
+      </div>
+      {% else %}
       <div class="muted" style="margin-top:4px">Tržišna cijena {{ d.market_price|money }} {{ d.currency }} (iz {{ d.comparables }} oglasa)</div>
+      {% endif %}
       {% if d.suspicious %}<div class="badge warn" style="margin-top:6px">Sumnjivo niska cijena – provjeri prije kupnje</div>{% endif %}
+      {% if d.explanation %}
+      <div class="explain">{{ d.explanation }}
+        {% set rs = d.reasons|reasons %}
+        {% if rs %}
+        <details><summary>Zašto {{ d.sell_probability|pct }} šanse prodaje?</summary>
+          <ul class="reasons">
+          {% for r in rs %}<li class="{{ 'plus' if r.points > 0 else ('minus' if r.points < 0 else 'muted') }}">{{ '+' if r.points > 0 else ('−' if r.points < 0 else '•') }} {{ r.text }}</li>{% endfor %}
+          </ul>
+        </details>
+        {% endif %}
+      </div>
+      {% endif %}
     </div>
     <form class="actions" method="post" action="{{ url_for('update_deal', deal_id=d.id) }}">
       <select name="status">{% for s in statuses %}<option value="{{ s }}" {% if s==d.status %}selected{% endif %}>{{ s|capitalize }}</option>{% endfor %}</select>
